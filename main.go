@@ -1,1 +1,1 @@
-package azik
+package azki
