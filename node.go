@@ -77,3 +77,93 @@ func handleWildCard(path string) string {
 
 	return path
 }
+
+type WildcardType int
+
+const (
+	static WildcardType = iota
+	param
+	catchAll
+)
+
+type Node struct {
+	path         string
+	children     []*Node
+	wildCard     bool
+	wildcardType WildcardType
+	priority     uint32
+	handler      Handle
+}
+
+func (n *Node) insertChild(path string, handle Handle) {
+    _ = handleWildCard(path) // validate wildcards
+
+    i := 0
+    for i < len(path) {
+        if path[i] == ':' {
+            // Static prefix before :
+            if i > 0 {
+                staticPart := path[:i]
+                child := &Node{
+                    path:         staticPart,
+                    wildcardType: static,
+                }
+                n.children = append(n.children, child)
+                n = child
+            }
+
+            // Param segment
+            paramEnd := i + 1
+            for paramEnd < len(path) && path[paramEnd] != '/' {
+                paramEnd++
+            }
+            paramPart := path[i:paramEnd]
+            child := &Node{
+                path:         paramPart,
+                wildCard:     true,
+                wildcardType: param,
+            }
+            n.children = append(n.children, child)
+            n = child
+
+            path = path[paramEnd:] // continue with remaining path
+			i=0
+            continue
+        }
+
+        if path[i] == '*' {
+            if i > 0 {
+                staticPart := path[:i]
+                child := &Node{
+                    path:         staticPart,
+                    wildcardType: static,
+                }
+                n.children = append(n.children, child)
+                n = child
+            }
+
+            catchAllPart := path[i:]
+            child := &Node{
+                path:         catchAllPart,
+                wildCard:     true,
+                wildcardType: catchAll,
+            }
+            n.children = append(n.children, child)
+            n = child
+            n.handler = handle
+            n.priority++
+            return
+        }
+
+        i++
+    }
+
+    // If no wildcard found, create a static path node
+    child := &Node{
+        path:         path,
+        wildcardType: static,
+        handler:      handle,
+    }
+    n.children = append(n.children, child)
+    child.priority++
+}
